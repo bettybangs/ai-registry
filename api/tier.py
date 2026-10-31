@@ -2,7 +2,9 @@
 
 POST /api/tier with a JSON intake submission. Returns a numeric score,
 a tier (Low, Medium, High, Critical), the factors that drove the score,
-and the review controls required for that tier.
+the review controls required for that tier, and a recommended starting
+review status. High and Critical tools are flagged as requiring human
+sign-off; nothing is ever rejected automatically.
 """
 from http.server import BaseHTTPRequestHandler
 import json
@@ -56,6 +58,15 @@ CONTROLS = {
     ],
 }
 
+# Starting review status by tier. Only Low risk is fast-tracked. Everything
+# else waits for a person, and High and Critical need explicit sign-off.
+STARTING_STATUS = {
+    "Low": ("Approved", "Low risk: fast-tracked once registered with a business owner"),
+    "Medium": ("In review", "Medium risk: needs a reviewer to complete the listed controls"),
+    "High": ("In review", "High risk: human sign-off required before approval"),
+    "Critical": ("Pending review", "Critical risk: Legal and Security sign-off required before any use"),
+}
+
 
 def tier_submission(data):
     score = 0
@@ -107,6 +118,9 @@ def tier_submission(data):
         "tier": tier,
         "factors": factors,
         "controls": CONTROLS[tier],
+        "recommended_status": STARTING_STATUS[tier][0],
+        "status_reason": STARTING_STATUS[tier][1],
+        "requires_signoff": tier in ("High", "Critical"),
     }
 
 

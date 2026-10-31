@@ -84,9 +84,9 @@ export default function App() {
       const entry = {
         id: Date.now(),
         submitted: new Date().toISOString().slice(0, 10),
-        status: "Pending review",
         ...form,
         ...tiered,
+        status: tiered.recommended_status || "Pending review",
       };
       setEntries((e) => [entry, ...e]);
       setResult(entry);
@@ -98,8 +98,20 @@ export default function App() {
     }
   }
 
-  const updateStatus = (id, status) =>
-    setEntries((e) => e.map((x) => (x.id === id ? { ...x, status } : x)));
+  const updateStatus = (id, status) => {
+    const entry = entries.find((x) => x.id === id);
+    const gated = entry && (entry.tier === "High" || entry.tier === "Critical");
+    let signedOff = false;
+    if (status === "Approved" && gated) {
+      const ok = window.confirm(
+        entry.tool_name + " is " + entry.tier + " risk and needs human sign-off before approval. " +
+        "Confirm that the required review controls are complete and sign-off is recorded?"
+      );
+      if (!ok) return;
+      signedOff = true;
+    }
+    setEntries((e) => e.map((x) => (x.id === id ? { ...x, status, signedOff: status === "Approved" ? signedOff : false } : x)));
+  };
   const remove = (id) => setEntries((e) => e.filter((x) => x.id !== id));
 
   return (
@@ -180,6 +192,7 @@ export default function App() {
           <ul>{result.factors.length ? result.factors.map((f) => <li key={f}>{f}</li>) : <li>No elevated risk factors</li>}</ul>
           <div style={{ marginTop: 8 }}><strong>Required review controls</strong></div>
           <ul>{result.controls.map((c) => <li key={c}>{c}</li>)}</ul>
+          <div className="statusnote"><strong>Starting status: {result.status}.</strong> {result.status_reason}.</div>
         </div>
       )}
 
@@ -203,6 +216,7 @@ export default function App() {
                     <select value={e.status} onChange={(ev) => updateStatus(e.id, ev.target.value)}>
                       {STATUSES.map((s) => <option key={s}>{s}</option>)}
                     </select>
+                    {e.signedOff && <div className="statusnote">Sign-off confirmed</div>}
                   </td>
                   <td>{e.submitted}</td>
                   <td><button className="ghost" onClick={() => remove(e.id)}>Remove</button></td>
